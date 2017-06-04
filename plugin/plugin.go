@@ -1,53 +1,62 @@
+/*
+Package plugin provides a generic way to define Plugins.
+
+A Plugin is a versioned unit of functionality that has dependencies to other Plugins.
+The actual functionality is opaque, represented by the Payload attribute
+*/
 package plugin
 
 import (
-	"context"
 	"errors"
-	"net/http"
+	"fmt"
 	"reflect"
 	"strings"
 )
 
+// Provider is the source of the plugin
 type Provider struct {
 	Name    string
-	Website string
+	URL     string
 	Contact string
 }
 
+// Dependency is a link from one plugin to another
 type Dependency struct {
-	ID    PluginID
+	ID    ID
 	Range Range
 }
 
-type Renderer interface {
-	Render(ctx *context.Context, w http.ResponseWriter) error
+func (d *Dependency) String() string {
+	return fmt.Sprintf("%s %s", d.ID, d.Range.String())
 }
 
-type Forwarder interface {
-	Forward(ctx *context.Context, r *http.Request)
-}
+// ID is a unique ID for the plugin.
+// There can be different versions for the same ID
+type ID string
 
-type HandlerFunc func(ctx *context.Context, r *http.Request, next Forwarder) (*context.Context, interface{})
-
-type PluginID string
-
+// Plugin describes a single loadable unit of functionality
+// A Plugin has a version and optionally may have dependencies to one or more other Plugins
 type Plugin struct {
-	ID           PluginID
+	ID           ID
 	Provider     Provider
 	Version      Version
 	Dependencies []Dependency
-	WebContext   string
-	HandlerFunc  HandlerFunc
+	Payload      interface{}
 }
 
+// Equals checks if one plugin is exactly equal to another
 func (p *Plugin) Equals(other *Plugin) bool {
 	return reflect.DeepEqual(*p, *other)
 }
 
+// Satisfies returns true if a Plugin has the same ID and falls within the Range
+// of a Dependency
 func (p *Plugin) Satisfies(d *Dependency) bool {
 	return p.ID == d.ID && p.Version.IsWithin(&d.Range)
 }
 
+// ParseDependency converts a string to a Dependency type
+// Returns not-nil error if unable to parse.
 func ParseDependency(s string) (*Dependency, error) {
 	i := strings.IndexAny(s, " [(")
 	if i < 0 {
@@ -60,7 +69,7 @@ func ParseDependency(s string) (*Dependency, error) {
 		return nil, err
 	}
 	return &Dependency{
-		ID:    PluginID(id),
+		ID:    ID(id),
 		Range: *r,
 	}, nil
 

@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/rovarghe/mule/loader"
 	"github.com/rovarghe/mule/plugin"
 )
 
@@ -27,6 +29,7 @@ func startServer() error {
 }
 
 func main() {
-	plugin.TestPlugin()
+
+	loader.Load(context.Background(), &[]*plugin.Plugin{}, nil)
 	log.Fatal(startServer())
 }

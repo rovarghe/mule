@@ -1,34 +1,32 @@
-package plugin
+package loader
 
 import (
 	"testing"
+
+	"github.com/rovarghe/mule/plugin"
+
+	"github.com/rovarghe/mule/test/harness"
 )
 
 func TestIsResolved(t *testing.T) {
+
 	var mavenPluginNode = &pluginNode{
-		plugin: &mavenPlugin,
+		plugin: &harness.MavenPlugin,
 	}
 
 	var basePluginNode = &pluginNode{
-		plugin: &basePlugin,
+		plugin: &harness.BasePlugin,
 	}
 
 	if mavenPluginNode.isResolved() {
 		t.Error("Should be unrsolved")
 	}
 
-	mavenPluginNode.dependencies = map[*Dependency]*pluginNode{
-		&mavenPlugin.Dependencies[0]: basePluginNode,
+	mavenPluginNode.dependencies = map[*plugin.Dependency]*pluginNode{
+		&harness.MavenPlugin.Dependencies[0]: basePluginNode,
 	}
 
 	if !mavenPluginNode.isResolved() {
 		t.Error("Should be resolved")
 	}
-}
-
-func TestLoadPlugins(t *testing.T) {
-	loadPlugins(&[]*Plugin{
-		&basePlugin, &mavenPlugin,
-	})
-
 }
