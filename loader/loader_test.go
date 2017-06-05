@@ -85,7 +85,7 @@ func TestLoadPlugins2(t *testing.T) {
 		}
 	*/
 
-	var orders = map[plugin.PluginID]bool{}
+	var orders = map[plugin.ID]bool{}
 	for i := 0; i < loaded.Count(); i++ {
 		p := loaded.Get(i).Plugin()
 		checked := false

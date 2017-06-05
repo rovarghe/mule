@@ -35,7 +35,7 @@ func (n *pluginNode) isResolved() bool {
 
 type pluginList []*pluginNode
 
-func resolve(node *pluginNode, all *map[plugin.PluginID]pluginList) bool {
+func resolve(node *pluginNode, all *map[plugin.ID]pluginList) bool {
 
 	var unresolved = 0
 	for _, d := range node.plugin.Dependencies {
@@ -145,7 +145,7 @@ type UnresolvedDependency struct {
 // if any one of the plugins' dependencies chould not be satisfied
 type UnresolvedDependenciesLoadError struct {
 	unresolved *unresolvedType
-	all        *map[plugin.PluginID]pluginList
+	all        *map[plugin.ID]pluginList
 }
 
 // Error returns a formatted string error message
@@ -201,7 +201,7 @@ type loaderState struct {
 	unresolved unresolvedType
 	loaded     pluginList
 	roots      pluginList
-	all        map[plugin.PluginID]pluginList
+	all        map[plugin.ID]pluginList
 }
 
 // Load goes through each plugin in order of its depedencies and pass
@@ -211,7 +211,7 @@ func Load(ctx context.Context, plugins *[]*plugin.Plugin, RegisterFunc RegisterF
 		unresolved: unresolvedType{},
 		loaded:     pluginList{},
 		roots:      pluginList{},
-		all:        map[plugin.PluginID]pluginList{},
+		all:        map[plugin.ID]pluginList{},
 	}
 
 	if len(*plugins) == 0 {
