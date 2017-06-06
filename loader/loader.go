@@ -26,26 +26,6 @@ type (
 	// the same.
 	UnregisterFunc func(ctx context.Context, state *LoadedPlugin) (context.Context, error)
 
-	// LoadedPlugins is the list of plugins that were successfully registered
-	LoadedPlugins interface {
-		Get(int) *LoadedPlugin
-		Unload(context.Context, UnregisterFunc) (context.Context, error)
-		Count() int
-	}
-
-	/*
-		// LoadedPlugin reflects the state of a particular plugin
-		LoadedPlugin interface {
-			// Returns the underlying Plugin
-			Plugin() *plugin.Plugin
-			// Returns the direct dependencies of this Plugin
-			Dependencies() map[*plugin.Dependency]LoadedPlugin
-			// Returns the direct dependents of this Plugin
-			Dependents() []LoadedPlugin
-			// State returns the completed phases of the registration for the plugin
-			State() RegistrationState
-		}
-	*/
 	// RegistrationState indicates whether the state of the registration.
 	// It passes through 3 phases: DependenciesRegistered, PluginRegistered and DependentsRegistered
 	RegistrationState int
@@ -67,23 +47,26 @@ type (
 		all        *map[plugin.ID]pluginList
 	}
 
-	loaderState struct {
+	pluginList []*LoadedPlugin
+
+	unresolvedType map[*LoadedPlugin]interface{}
+
+	// LoadedPlugins stores information about plugins as seen by the loader
+	LoadedPlugins struct {
 		unresolved unresolvedType
 		loaded     pluginList
 		roots      pluginList
 		all        map[plugin.ID]pluginList
 	}
 
+	// LoadedPlugin stores information about a particular plugin as determined by
+	// the loader.
 	LoadedPlugin struct {
 		plugin       *plugin.Plugin
 		dependencies map[*plugin.Dependency]*LoadedPlugin
 		dependents   pluginList
 		state        RegistrationState
 	}
-
-	pluginList []*LoadedPlugin
-
-	unresolvedType map[*LoadedPlugin]interface{}
 )
 
 const (
@@ -127,7 +110,7 @@ func resolve(node *LoadedPlugin, all *map[plugin.ID]pluginList) bool {
 	return unresolved == 0
 }
 
-func flattenRoots(state *loaderState, ctx context.Context, RegisterFunc RegisterFunc) error {
+func flattenRoots(state *LoadedPlugins, ctx context.Context, RegisterFunc RegisterFunc) error {
 	var seen = &map[*LoadedPlugin]bool{}
 
 	for _, node := range state.roots {
@@ -141,7 +124,7 @@ func flattenRoots(state *loaderState, ctx context.Context, RegisterFunc Register
 
 func flattenPluginNodes(n *LoadedPlugin,
 	seen *map[*LoadedPlugin]bool,
-	state *loaderState,
+	state *LoadedPlugins,
 	ctx context.Context,
 	RegisterFunc RegisterFunc) error {
 
@@ -239,8 +222,8 @@ func (e *UnresolvedDependenciesLoadError) UnresolvedDependencies() []UnresolvedD
 
 // Load goes through each plugin in order of its depedencies and pass
 // it to the RegisterFunc to do whatever initialization it wants to do.
-func Load(ctx context.Context, plugins *[]*plugin.Plugin, RegisterFunc RegisterFunc) (context.Context, LoadedPlugins, error) {
-	state := &loaderState{
+func Load(ctx context.Context, plugins *[]*plugin.Plugin, RegisterFunc RegisterFunc) (context.Context, *LoadedPlugins, error) {
+	state := &LoadedPlugins{
 		unresolved: unresolvedType{},
 		loaded:     pluginList{},
 		roots:      pluginList{},
@@ -296,7 +279,7 @@ func Load(ctx context.Context, plugins *[]*plugin.Plugin, RegisterFunc RegisterF
 }
 
 // Unload deregisters the plugins that were successfuly registered by Load()
-func (state *loaderState) Unload(ctx context.Context, unRegisterFunc UnregisterFunc) (context.Context, error) {
+func (state *LoadedPlugins) Unload(ctx context.Context, unRegisterFunc UnregisterFunc) (context.Context, error) {
 	var i = len(state.loaded)
 	var err error
 	for ; i > 0; i-- {
@@ -309,8 +292,12 @@ func (state *loaderState) Unload(ctx context.Context, unRegisterFunc UnregisterF
 	return ctx, err
 }
 
-func (state *loaderState) Count() int {
+func (state *LoadedPlugins) Count() int {
 	return len(state.loaded)
+}
+
+func (state *LoadedPlugins) Get(i int) *LoadedPlugin {
+	return state.loaded[i]
 }
 
 func (n *LoadedPlugin) Plugin() *plugin.Plugin {
@@ -336,8 +323,4 @@ func (n *LoadedPlugin) Dependents() []*LoadedPlugin {
 
 func (n *LoadedPlugin) State() RegistrationState {
 	return n.state
-}
-
-func (state *loaderState) Get(i int) *LoadedPlugin {
-	return state.loaded[i]
 }
