@@ -14,28 +14,94 @@ import (
 	"github.com/rovarghe/mule/plugin"
 )
 
-// RegisterFunc is an initializer function
-type RegisterFunc func(
-	ctx context.Context,
-	state LoadedPlugin) (context.Context, error)
+type (
+	// RegisterFunc is an initializer function
+	// The context is created by the client
+	RegisterFunc func(
+		ctx context.Context,
+		state *LoadedPlugin) (context.Context, error)
 
-// UnregisterFunc is expected to reverse the actions of RegisterFunc
-type UnregisterFunc func(ctx context.Context, state LoadedPlugin) (context.Context, error)
+	// UnregisterFunc is expected to reverse the actions of RegisterFunc
+	// There is no requirement the same Context be used as Load(), but normally it would be
+	// the same.
+	UnregisterFunc func(ctx context.Context, state *LoadedPlugin) (context.Context, error)
 
-type pluginNode struct {
-	plugin       *plugin.Plugin
-	dependencies map[*plugin.Dependency]*pluginNode
-	dependents   pluginList
-	state        RegistrationState
-}
+	// LoadedPlugins is the list of plugins that were successfully registered
+	LoadedPlugins interface {
+		Get(int) *LoadedPlugin
+		Unload(context.Context, UnregisterFunc) (context.Context, error)
+		Count() int
+	}
 
-func (n *pluginNode) isResolved() bool {
+	/*
+		// LoadedPlugin reflects the state of a particular plugin
+		LoadedPlugin interface {
+			// Returns the underlying Plugin
+			Plugin() *plugin.Plugin
+			// Returns the direct dependencies of this Plugin
+			Dependencies() map[*plugin.Dependency]LoadedPlugin
+			// Returns the direct dependents of this Plugin
+			Dependents() []LoadedPlugin
+			// State returns the completed phases of the registration for the plugin
+			State() RegistrationState
+		}
+	*/
+	// RegistrationState indicates whether the state of the registration.
+	// It passes through 3 phases: DependenciesRegistered, PluginRegistered and DependentsRegistered
+	RegistrationState int
+
+	// NoRootsLoadError is returned if there are no plugins to be loaded, or if dependencies are circular
+	NoRootsLoadError struct{}
+
+	// UnresolvedDependency is returned within UnresolvedDependenciesLoadError for each dependency that could
+	// not be satisfied
+	UnresolvedDependency struct {
+		Plugin     *plugin.Plugin
+		Dependency map[*plugin.Dependency][]*plugin.Plugin
+	}
+
+	// UnresolvedDependenciesLoadError is returned as the error type if the list of plugins are incomplete and
+	// if any one of the plugins' dependencies chould not be satisfied
+	UnresolvedDependenciesLoadError struct {
+		unresolved *unresolvedType
+		all        *map[plugin.ID]pluginList
+	}
+
+	loaderState struct {
+		unresolved unresolvedType
+		loaded     pluginList
+		roots      pluginList
+		all        map[plugin.ID]pluginList
+	}
+
+	LoadedPlugin struct {
+		plugin       *plugin.Plugin
+		dependencies map[*plugin.Dependency]*LoadedPlugin
+		dependents   pluginList
+		state        RegistrationState
+	}
+
+	pluginList []*LoadedPlugin
+
+	unresolvedType map[*LoadedPlugin]interface{}
+)
+
+const (
+	// DependenciesRegistered state indicates that all the parents of the plugiin have been successfully
+	// registered
+	DependenciesRegistered RegistrationState = iota
+	// PluginRegistered indicates the plugin itself has been registered
+	PluginRegistered
+	// DependentsRegistered indicates all the children of the plugin, i.e. all its dependents have been
+	// successfully registered
+	DependentsRegistered
+)
+
+func (n *LoadedPlugin) isResolved() bool {
 	return len(n.plugin.Dependencies) == len(n.dependencies)
 }
 
-type pluginList []*pluginNode
-
-func resolve(node *pluginNode, all *map[plugin.ID]pluginList) bool {
+func resolve(node *LoadedPlugin, all *map[plugin.ID]pluginList) bool {
 
 	var unresolved = 0
 	for _, d := range node.plugin.Dependencies {
@@ -62,7 +128,7 @@ func resolve(node *pluginNode, all *map[plugin.ID]pluginList) bool {
 }
 
 func flattenRoots(state *loaderState, ctx context.Context, RegisterFunc RegisterFunc) error {
-	var seen = &map[*pluginNode]bool{}
+	var seen = &map[*LoadedPlugin]bool{}
 
 	for _, node := range state.roots {
 		err := flattenPluginNodes(node, seen, state, ctx, RegisterFunc)
@@ -73,8 +139,8 @@ func flattenRoots(state *loaderState, ctx context.Context, RegisterFunc Register
 	return nil
 }
 
-func flattenPluginNodes(n *pluginNode,
-	seen *map[*pluginNode]bool,
+func flattenPluginNodes(n *LoadedPlugin,
+	seen *map[*LoadedPlugin]bool,
 	state *loaderState,
 	ctx context.Context,
 	RegisterFunc RegisterFunc) error {
@@ -114,8 +180,6 @@ func flattenPluginNodes(n *pluginNode,
 	return nil
 }
 
-type unresolvedType map[*pluginNode]interface{}
-
 func (ur *unresolvedType) String() string {
 	var sep = ""
 	var str = ""
@@ -127,25 +191,8 @@ func (ur *unresolvedType) String() string {
 	return str
 }
 
-// NoRootsLoadError is returned if there are no plugins to be loaded, or if dependencies are circular
-type NoRootsLoadError struct{}
-
 func (e NoRootsLoadError) Error() string {
 	return "No roots detected"
-}
-
-// UnresolvedDependency is returned within UnresolvedDependenciesLoadError for each dependency that could
-// not be satisfied
-type UnresolvedDependency struct {
-	Plugin     *plugin.Plugin
-	Dependency map[*plugin.Dependency][]*plugin.Plugin
-}
-
-// UnresolvedDependenciesLoadError is returned as the error type if the list of plugins are incomplete and
-// if any one of the plugins' dependencies chould not be satisfied
-type UnresolvedDependenciesLoadError struct {
-	unresolved *unresolvedType
-	all        *map[plugin.ID]pluginList
 }
 
 // Error returns a formatted string error message
@@ -190,20 +237,6 @@ func (e *UnresolvedDependenciesLoadError) UnresolvedDependencies() []UnresolvedD
 	return list
 }
 
-// LoadedPlugins is the list of plugins that were successfully registered
-type LoadedPlugins interface {
-	Get(int) LoadedPlugin
-	Unload(context.Context, UnregisterFunc) (context.Context, error)
-	Count() int
-}
-
-type loaderState struct {
-	unresolved unresolvedType
-	loaded     pluginList
-	roots      pluginList
-	all        map[plugin.ID]pluginList
-}
-
 // Load goes through each plugin in order of its depedencies and pass
 // it to the RegisterFunc to do whatever initialization it wants to do.
 func Load(ctx context.Context, plugins *[]*plugin.Plugin, RegisterFunc RegisterFunc) (context.Context, LoadedPlugins, error) {
@@ -219,9 +252,9 @@ func Load(ctx context.Context, plugins *[]*plugin.Plugin, RegisterFunc RegisterF
 	}
 
 	for _, p := range *plugins {
-		node := &pluginNode{
+		node := &LoadedPlugin{
 			plugin:       p,
-			dependencies: map[*plugin.Dependency]*pluginNode{},
+			dependencies: map[*plugin.Dependency]*LoadedPlugin{},
 			dependents:   pluginList{},
 		}
 		if !resolve(node, &state.all) {
@@ -280,48 +313,20 @@ func (state *loaderState) Count() int {
 	return len(state.loaded)
 }
 
-// RegistrationState indicates whether the state of the registration.
-// It passes through 3 phases: DependenciesRegistered, PluginRegistered and DependentsRegistered
-type RegistrationState int
-
-const (
-	// DependenciesRegistered state indicates that all the parents of the plugiin have been successfully
-	// registered
-	DependenciesRegistered RegistrationState = iota
-	// PluginRegistered indicates the plugin itself has been registered
-	PluginRegistered
-	// DependentsRegistered indicates all the children of the plugin, i.e. all its dependents have been
-	// successfully registered
-	DependentsRegistered
-)
-
-// LoadedPlugin reflects the state of a particular plugin
-type LoadedPlugin interface {
-	// Returns the underlying Plugin
-	Plugin() *plugin.Plugin
-	// Returns the direct dependencies of this Plugin
-	Dependencies() map[*plugin.Dependency]LoadedPlugin
-	// Returns the direct dependents of this Plugin
-	Dependents() []LoadedPlugin
-	// IsLoaded returns true if this plugin and all its dependencies and dependents
-	// have been loaded
-	State() RegistrationState
-}
-
-func (n *pluginNode) Plugin() *plugin.Plugin {
+func (n *LoadedPlugin) Plugin() *plugin.Plugin {
 	return n.plugin
 }
 
-func (n *pluginNode) Dependencies() map[*plugin.Dependency]LoadedPlugin {
-	var ret = map[*plugin.Dependency]LoadedPlugin{}
+func (n *LoadedPlugin) Dependencies() map[*plugin.Dependency]*LoadedPlugin {
+	var ret = map[*plugin.Dependency]*LoadedPlugin{}
 	for d, dn := range n.dependencies {
 		ret[d] = dn
 	}
 	return ret
 }
 
-func (n *pluginNode) Dependents() []LoadedPlugin {
-	var ret = make([]LoadedPlugin, len(n.dependents))
+func (n *LoadedPlugin) Dependents() []*LoadedPlugin {
+	var ret = make([]*LoadedPlugin, len(n.dependents))
 
 	for i, dn := range n.dependents {
 		ret[i] = dn
@@ -329,10 +334,10 @@ func (n *pluginNode) Dependents() []LoadedPlugin {
 	return ret
 }
 
-func (n *pluginNode) State() RegistrationState {
+func (n *LoadedPlugin) State() RegistrationState {
 	return n.state
 }
 
-func (state *loaderState) Get(i int) LoadedPlugin {
+func (state *loaderState) Get(i int) *LoadedPlugin {
 	return state.loaded[i]
 }

@@ -10,11 +10,11 @@ import (
 
 func TestIsResolved(t *testing.T) {
 
-	var mavenPluginNode = &pluginNode{
+	var mavenPluginNode = &LoadedPlugin{
 		plugin: &harness.MavenPlugin,
 	}
 
-	var basePluginNode = &pluginNode{
+	var basePluginNode = &LoadedPlugin{
 		plugin: &harness.BasePlugin,
 	}
 
@@ -22,7 +22,7 @@ func TestIsResolved(t *testing.T) {
 		t.Error("Should be unrsolved")
 	}
 
-	mavenPluginNode.dependencies = map[*plugin.Dependency]*pluginNode{
+	mavenPluginNode.dependencies = map[*plugin.Dependency]*LoadedPlugin{
 		&harness.MavenPlugin.Dependencies[0]: basePluginNode,
 	}
 

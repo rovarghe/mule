@@ -10,7 +10,7 @@ import (
 )
 
 func registerFunc(t *testing.T) loader.RegisterFunc {
-	return func(ctx context.Context, ps loader.LoadedPlugin) (context.Context, error) {
+	return func(ctx context.Context, ps *loader.LoadedPlugin) (context.Context, error) {
 
 		t.Log("Loading plugin", ps.Plugin().ID)
 		if ps.State() != loader.DependenciesRegistered {
@@ -21,7 +21,7 @@ func registerFunc(t *testing.T) loader.RegisterFunc {
 }
 
 func unregisterFunc(t *testing.T) loader.UnregisterFunc {
-	return func(ctx context.Context, ps loader.LoadedPlugin) (context.Context, error) {
+	return func(ctx context.Context, ps *loader.LoadedPlugin) (context.Context, error) {
 		t.Log("Unloading plugin", ps.Plugin().ID)
 		if ps.State() != loader.PluginRegistered && ps.State() != loader.DependentsRegistered {
 			t.Error("Unexpected state, expecting PluginLoadedState", ps.State(), ps.Plugin().ID, ps.Plugin().Version)
