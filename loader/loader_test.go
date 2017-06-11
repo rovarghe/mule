@@ -12,7 +12,7 @@ import (
 func registerFunc(t *testing.T) loader.RegisterFunc {
 	return func(ctx context.Context, ps *loader.LoadedPlugin) (context.Context, error) {
 
-		t.Log("Loading plugin", ps.Plugin().ID)
+		t.Log("Loading plugin", ps.Plugin().ID())
 		if ps.State() != loader.DependenciesRegistered {
 			t.Error("Unexpected state, dependencies shuld be loaded", ps.Plugin())
 		}
@@ -31,34 +31,34 @@ func unregisterFunc(t *testing.T) loader.UnregisterFunc {
 }
 
 func TestLoadPlugins(t *testing.T) {
-	var plugins = []*plugin.Plugin{
-		&harness.MavenPlugin, &harness.BasePlugin,
+	var plugins = []plugin.Plugin{
+		harness.MavenPlugin, harness.BasePlugin,
 	}
 
 	ctx := context.Background()
 	ctx = context.WithValue(ctx, 1, "FOO")
-	ctx, loaded, err := loader.Load(ctx, &plugins, registerFunc(t))
+	ctx, loaded, err := loader.Load(ctx, plugins, registerFunc(t))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if loaded.Get(0).Plugin() != &harness.BasePlugin {
+	if !plugin.PluginEquals(loaded.Get(0).Plugin(), harness.BasePlugin) {
 		t.Fatal("Base should be at 0")
 	}
-	if loaded.Get(1).Plugin() != &harness.MavenPlugin {
+	if !plugin.PluginEquals(loaded.Get(1).Plugin(), harness.MavenPlugin) {
 		t.Fatal("Maven plugin should be at 1")
 	}
 }
 
 func TestLoadPlugins2(t *testing.T) {
 
-	var plugins = []*plugin.Plugin{
-		&harness.MvnTestReportsPlugin,
-		&harness.MavenArtifactPlugin,
-		&harness.MavenTestPlugin,
-		&harness.MavenPlugin,
-		&harness.GitPlugin,
-		&harness.BasePlugin,
+	var plugins = []plugin.Plugin{
+		harness.MvnTestReportsPlugin,
+		harness.MavenArtifactPlugin,
+		harness.MavenTestPlugin,
+		harness.MavenPlugin,
+		harness.GitPlugin,
+		harness.BasePlugin,
 	}
 	/*
 		for i, p := range plugins {
@@ -66,7 +66,7 @@ func TestLoadPlugins2(t *testing.T) {
 		}
 	*/
 	ctx := context.WithValue(context.Background(), 2, "BAR")
-	ctx, loaded, err := loader.Load(ctx, &plugins, registerFunc(t))
+	ctx, loaded, err := loader.Load(ctx, plugins, registerFunc(t))
 	loaded.Unload(ctx, unregisterFunc(t))
 	if err != nil {
 		switch err.(type) {
@@ -89,7 +89,7 @@ func TestLoadPlugins2(t *testing.T) {
 	for i := 0; i < loaded.Count(); i++ {
 		p := loaded.Get(i).Plugin()
 		checked := false
-		switch p.ID {
+		switch p.ID() {
 		case "base":
 			if i != 0 {
 				t.Error("Expected base")
@@ -126,7 +126,7 @@ func TestLoadPlugins2(t *testing.T) {
 
 		}
 
-		orders[p.ID] = true
+		orders[p.ID()] = true
 		if !checked {
 			t.Error("Failed check", i, p.ID)
 		}

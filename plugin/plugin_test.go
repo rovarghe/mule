@@ -110,14 +110,9 @@ func TestPluginSatisfiesDependency(t *testing.T) {
 	}
 
 	for _, r := range table {
-		if harness.MavenPlugin.Satisfies(&r.depedency) != r.result {
+		if plugin.Satisfies(harness.MavenPlugin, r.depedency) != r.result {
 			t.Fatal("failure for dependency ", r.depedency, harness.MavenPlugin)
 		}
 	}
 
-}
-func TestPluginEquals(t *testing.T) {
-	if !harness.MavenPlugin.Equals(&harness.MavenPluginCopy) {
-		t.Fail()
-	}
 }

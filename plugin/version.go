@@ -17,7 +17,7 @@ type Version struct {
 }
 
 // Compare one version to another
-func (v *Version) Compare(other *Version) int {
+func (v Version) Compare(other Version) int {
 	switch {
 	case v.Major < other.Major:
 		return -1
@@ -44,13 +44,18 @@ func (v *Version) Compare(other *Version) int {
 }
 
 // String representation of Version
-func (v *Version) String() string {
+func (v Version) String() string {
 	if v.Label == "" {
 		return fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
 	}
 
 	return fmt.Sprintf("%d.%d.%d-%s", v.Major, v.Minor, v.Patch, v.Label)
 
+}
+
+// Equals compares two versions
+func (v Version) Equals(o Version) bool {
+	return v.Compare(o) == 0
 }
 
 // ParseVersion takes  a string representation and converts it into a Version type
@@ -132,16 +137,16 @@ func (r *Range) String() string {
 }
 
 // IsWithin returns true if Version falls within the range specified
-func (v *Version) IsWithin(r *Range) bool {
+func (v Version) IsWithin(r Range) bool {
 	switch {
 	case r.MinInclusive && r.MaxInclusive:
-		return v.Compare(&r.Minimum) >= 0 && v.Compare(&r.Maximum) <= 0
+		return v.Compare(r.Minimum) >= 0 && v.Compare(r.Maximum) <= 0
 	case r.MinInclusive && !r.MaxInclusive:
-		return v.Compare(&r.Minimum) >= 0 && v.Compare(&r.Maximum) < 0
+		return v.Compare(r.Minimum) >= 0 && v.Compare(r.Maximum) < 0
 	case !r.MinInclusive && r.MaxInclusive:
-		return v.Compare(&r.Minimum) > 0 && v.Compare(&r.Maximum) <= 0
+		return v.Compare(r.Minimum) > 0 && v.Compare(r.Maximum) <= 0
 	default: //!d.MinInclusive && !d.MaxInclusive
-		return v.Compare(&r.Minimum) > 0 && v.Compare(&r.Maximum) < 0
+		return v.Compare(r.Minimum) > 0 && v.Compare(r.Maximum) < 0
 	}
 }
 
@@ -185,7 +190,7 @@ func ParseRange(s string) (*Range, error) {
 	}
 
 	// Validate range
-	switch r.Minimum.Compare(&r.Maximum) {
+	switch r.Minimum.Compare(r.Maximum) {
 	case 1:
 		return nil, errors.New("Minimum version cannot be greater than maximum")
 	case 0:

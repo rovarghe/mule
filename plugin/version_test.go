@@ -14,16 +14,16 @@ func TestVersionEquals(t *testing.T) {
 }
 
 func TestVersionCompare(t *testing.T) {
-	if harness.V1_0_0.Compare(&harness.V1_0_0copy) != 0 {
+	if harness.V1_0_0.Compare(harness.V1_0_0copy) != 0 {
 		t.Fatal("Equal compare failed")
 	}
-	if harness.V1_0_0.Compare(&harness.V1_0_1) != -1 {
+	if harness.V1_0_0.Compare(harness.V1_0_1) != -1 {
 		t.Fatal("Less than failure")
 	}
-	if harness.V1_0_1.Compare(&harness.V1_0_0) != 1 {
+	if harness.V1_0_1.Compare(harness.V1_0_0) != 1 {
 		t.Fatal("Greather than failure")
 	}
-	if harness.V2_0_0beta.Compare(&harness.V2_0_0rel) != -1 {
+	if harness.V2_0_0beta.Compare(harness.V2_0_0rel) != -1 {
 		t.Fatal("Label compare failed")
 	}
 
@@ -52,9 +52,9 @@ func TestParseVersion(t *testing.T) {
 		t.Error(e)
 	}
 	switch {
-	case v.Maximum.Compare(&plugin.Version{1, 2, 3, ""}) != 0:
+	case v.Maximum.Compare(plugin.Version{1, 2, 3, ""}) != 0:
 		t.Error("Max version range parse error")
-	case v.Minimum.Compare(&plugin.Version{1, 2, 3, ""}) != 0:
+	case v.Minimum.Compare(plugin.Version{1, 2, 3, ""}) != 0:
 		t.Error("Min version range parse error")
 	case v.MaxInclusive != true:
 		t.Error("Max inclusive parse error")

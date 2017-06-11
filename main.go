@@ -30,6 +30,6 @@ func startServer() error {
 
 func main() {
 
-	loader.Load(context.Background(), &[]*plugin.Plugin{}, nil)
+	loader.Load(context.Background(), []plugin.Plugin{}, nil)
 	log.Fatal(startServer())
 }

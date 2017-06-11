@@ -13,20 +13,13 @@ import (
 	"strings"
 )
 
-// Provider is the source of the plugin
-type Provider struct {
-	Name    string
-	URL     string
-	Contact string
-}
-
 // Dependency is a link from one plugin to another
 type Dependency struct {
 	ID    ID
 	Range Range
 }
 
-func (d *Dependency) String() string {
+func (d Dependency) String() string {
 	return fmt.Sprintf("%s %s", d.ID, d.Range.String())
 }
 
@@ -34,25 +27,51 @@ func (d *Dependency) String() string {
 // There can be different versions for the same ID
 type ID string
 
-// Plugin describes a single loadable unit of functionality
-// A Plugin has a version and optionally may have dependencies to one or more other Plugins
-type Plugin struct {
-	ID           ID
-	Provider     Provider
-	Version      Version
-	Dependencies []Dependency
-	Payload      interface{}
+func (id ID) Equals(other ID) bool {
+	return id == other
 }
 
-// Equals checks if one plugin is exactly equal to another
-func (p *Plugin) Equals(other *Plugin) bool {
-	return reflect.DeepEqual(*p, *other)
+// Plugin describes a single loadable unit of functionality
+// A Plugin has a version and optionally may have dependencies to one or more other Plugins
+type Plugin interface {
+	ID() ID
+	Version() Version
+	Dependencies() []Dependency
+	//Payload      interface{}
+}
+
+type DefaultPlugin struct {
+	id           ID
+	version      Version
+	dependencies []Dependency
+}
+
+func (p DefaultPlugin) ID() ID {
+	return p.id
+}
+
+func (p DefaultPlugin) Version() Version {
+	return p.version
+}
+
+func (p DefaultPlugin) Dependencies() []Dependency {
+	return p.dependencies
+}
+
+func NewPlugin(id ID, version Version, dependencies []Dependency) Plugin {
+	return DefaultPlugin{id, version, dependencies}
 }
 
 // Satisfies returns true if a Plugin has the same ID and falls within the Range
 // of a Dependency
-func (p *Plugin) Satisfies(d *Dependency) bool {
-	return p.ID == d.ID && p.Version.IsWithin(&d.Range)
+func Satisfies(p Plugin, d Dependency) bool {
+	return p.ID() == d.ID && p.Version().IsWithin(d.Range)
+}
+
+func PluginEquals(f Plugin, s Plugin) bool {
+	return f.ID().Equals(s.ID()) &&
+		s.Version().Equals(f.Version()) &&
+		reflect.DeepEqual(f.Dependencies(), s.Dependencies())
 }
 
 // ParseDependency converts a string to a Dependency type

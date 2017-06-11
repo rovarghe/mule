@@ -9,6 +9,7 @@ var V1_0_2 = plugin.Version{1, 0, 2, ""}
 var V2_0_0rel = plugin.Version{2, 0, 0, "rel"}
 var V2_0_0beta = plugin.Version{2, 0, 0, "beta"}
 
+/*
 var provider0 = plugin.Provider{
 	Name: "rovarghe",
 	URL:  "github.com/rovarghe/mule",
@@ -28,19 +29,17 @@ var provider3 = plugin.Provider{
 	Name: "example",
 	URL:  "example.com/provider3",
 }
+*/
 
-var BasePlugin = plugin.Plugin{
-	ID:           plugin.ID("base"),
-	Provider:     provider1,
-	Dependencies: []plugin.Dependency{},
-	Version:      V1_0_0,
-}
+var BasePlugin = plugin.NewPlugin(
+	plugin.ID("base"),
+	V1_0_0,
+	[]plugin.Dependency{})
 
-var MavenPluginCopy = plugin.Plugin{
-	ID:       plugin.ID("maven"),
-	Provider: provider2,
-	Version:  V1_0_2,
-	Dependencies: []plugin.Dependency{
+var MavenPluginCopy = plugin.NewPlugin(
+	plugin.ID("maven"),
+	V1_0_2,
+	[]plugin.Dependency{
 		plugin.Dependency{
 			ID: "base",
 			Range: plugin.Range{
@@ -50,14 +49,13 @@ var MavenPluginCopy = plugin.Plugin{
 				MaxInclusive: false,
 			},
 		},
-	},
-}
+	})
 
-var MavenPlugin = plugin.Plugin{
-	ID:       plugin.ID("maven"),
-	Version:  V1_0_2,
-	Provider: provider2,
-	Dependencies: []plugin.Dependency{
+var MavenPlugin = plugin.NewPlugin(
+	plugin.ID("maven"),
+	V1_0_2,
+
+	[]plugin.Dependency{
 		plugin.Dependency{
 			ID: "base",
 			Range: plugin.Range{
@@ -66,14 +64,13 @@ var MavenPlugin = plugin.Plugin{
 				MinInclusive: true,
 				MaxInclusive: false},
 		},
-	},
-}
+	})
 
-var MavenTestPlugin = plugin.Plugin{
-	ID:       plugin.ID("maven-test"),
-	Version:  V1_0_1,
-	Provider: provider2,
-	Dependencies: []plugin.Dependency{
+var MavenTestPlugin = plugin.NewPlugin(
+	plugin.ID("maven-test"),
+	V1_0_1,
+
+	[]plugin.Dependency{
 		plugin.Dependency{
 			ID: "maven",
 			Range: plugin.Range{
@@ -81,14 +78,13 @@ var MavenTestPlugin = plugin.Plugin{
 				Maximum: V2_0_0beta,
 			},
 		},
-	},
-}
+	})
 
-var MavenArtifactPlugin = plugin.Plugin{
-	ID:       plugin.ID("maven-artifact"),
-	Version:  V1_0_0,
-	Provider: provider2,
-	Dependencies: []plugin.Dependency{
+var MavenArtifactPlugin = plugin.NewPlugin(
+	plugin.ID("maven-artifact"),
+	V1_0_0,
+
+	[]plugin.Dependency{
 		plugin.Dependency{
 			ID: "maven",
 			Range: plugin.Range{
@@ -106,14 +102,13 @@ var MavenArtifactPlugin = plugin.Plugin{
 				MaxInclusive: true,
 			},
 		},
-	},
-}
+	})
 
-var MvnTestReportsPlugin = plugin.Plugin{
-	ID:       plugin.ID("mvn-test-reports"),
-	Version:  V1_0_0,
-	Provider: provider2,
-	Dependencies: []plugin.Dependency{
+var MvnTestReportsPlugin = plugin.NewPlugin(
+	plugin.ID("mvn-test-reports"),
+	V1_0_0,
+	//Provider: provider2,
+	[]plugin.Dependency{
 		plugin.Dependency{
 			ID: "maven-test",
 			Range: plugin.Range{
@@ -123,14 +118,13 @@ var MvnTestReportsPlugin = plugin.Plugin{
 				MaxInclusive: true,
 			},
 		},
-	},
-}
+	})
 
-var GitPlugin = plugin.Plugin{
-	ID:       plugin.ID("git"),
-	Version:  V1_0_2,
-	Provider: provider3,
-	Dependencies: []plugin.Dependency{
+var GitPlugin = plugin.NewPlugin(
+	plugin.ID("git"),
+	V1_0_2,
+
+	[]plugin.Dependency{
 		plugin.Dependency{
 			ID: "base",
 			Range: plugin.Range{
@@ -140,5 +134,4 @@ var GitPlugin = plugin.Plugin{
 				MaxInclusive: true,
 			},
 		},
-	},
-}
+	})

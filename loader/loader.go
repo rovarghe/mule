@@ -36,8 +36,8 @@ type (
 	// UnresolvedDependency is returned within UnresolvedDependenciesLoadError for each dependency that could
 	// not be satisfied
 	UnresolvedDependency struct {
-		Plugin     *plugin.Plugin
-		Dependency map[*plugin.Dependency][]*plugin.Plugin
+		Plugin     plugin.Plugin
+		Dependency map[plugin.Dependency][]plugin.Plugin
 	}
 
 	// UnresolvedDependenciesLoadError is returned as the error type if the list of plugins are incomplete and
@@ -62,8 +62,8 @@ type (
 	// LoadedPlugin stores information about a particular plugin as determined by
 	// the loader.
 	LoadedPlugin struct {
-		plugin       *plugin.Plugin
-		dependencies map[*plugin.Dependency]*LoadedPlugin
+		plugin       plugin.Plugin
+		dependencies map[plugin.Dependency]*LoadedPlugin
 		dependents   pluginList
 		state        RegistrationState
 	}
@@ -81,21 +81,21 @@ const (
 )
 
 func (n *LoadedPlugin) isResolved() bool {
-	return len(n.plugin.Dependencies) == len(n.dependencies)
+	return len(n.plugin.Dependencies()) == len(n.dependencies)
 }
 
 func resolve(node *LoadedPlugin, all *map[plugin.ID]pluginList) bool {
 
 	var unresolved = 0
-	for _, d := range node.plugin.Dependencies {
+	for _, d := range node.plugin.Dependencies() {
 		flag := false
 		versions := (*all)[d.ID]
 		if versions != nil {
 			// does any version satisfy dependency
 			for _, v := range versions {
-				if v.plugin.Satisfies(&d) {
+				if plugin.Satisfies(v.plugin, d) {
 					// Link parent and child
-					node.dependencies[&d] = v
+					node.dependencies[d] = v
 					v.dependents = append(v.dependents, node)
 					flag = true
 					break
@@ -168,7 +168,7 @@ func (ur *unresolvedType) String() string {
 	var str = ""
 	for n := range *ur {
 
-		str = fmt.Sprintf("%s%v%s", str, *n.plugin, sep)
+		str = fmt.Sprintf("%s%v%s", str, (*n).plugin, sep)
 		sep = ","
 	}
 	return str
@@ -182,13 +182,13 @@ func (e NoRootsLoadError) Error() string {
 func (e UnresolvedDependenciesLoadError) Error() string {
 	str := ""
 	for _, ud := range e.UnresolvedDependencies() {
-		str = fmt.Sprintln("Cannot resolve plugin [", ud.Plugin.ID, ud.Plugin.Version.String(), "]")
+		str = fmt.Sprintln("Cannot resolve plugin [", ud.Plugin.ID(), ud.Plugin.Version(), "]")
 
 		for d, p := range ud.Dependency {
 			str = fmt.Sprintf("%s Missing dependency: %s\n", str, d.String())
 			str = fmt.Sprintf("%s Candidates:\n", str)
 			for _, plugin := range p {
-				str = fmt.Sprintf("%s   %s %s\n", str, plugin.ID, plugin.Version.String())
+				str = fmt.Sprintf("%s   %s %s\n", str, plugin.ID(), plugin.Version().String())
 			}
 		}
 
@@ -202,16 +202,16 @@ func (e *UnresolvedDependenciesLoadError) UnresolvedDependencies() []UnresolvedD
 	for u := range *e.unresolved {
 		var ud = UnresolvedDependency{
 			Plugin:     u.plugin,
-			Dependency: map[*plugin.Dependency][]*plugin.Plugin{},
+			Dependency: map[plugin.Dependency][]plugin.Plugin{},
 		}
-		for _, d := range u.plugin.Dependencies {
+		for _, d := range u.plugin.Dependencies() {
 
-			var candidates = []*plugin.Plugin{}
+			var candidates = []plugin.Plugin{}
 			for _, c := range (*e.all)[d.ID] {
 				candidates = append(candidates, c.plugin)
 			}
 
-			ud.Dependency[&d] = candidates
+			ud.Dependency[d] = candidates
 
 		}
 		list = append(list, ud)
@@ -222,7 +222,7 @@ func (e *UnresolvedDependenciesLoadError) UnresolvedDependencies() []UnresolvedD
 
 // Load goes through each plugin in order of its depedencies and pass
 // it to the RegisterFunc to do whatever initialization it wants to do.
-func Load(ctx context.Context, plugins *[]*plugin.Plugin, RegisterFunc RegisterFunc) (context.Context, *LoadedPlugins, error) {
+func Load(ctx context.Context, plugins []plugin.Plugin, RegisterFunc RegisterFunc) (context.Context, *LoadedPlugins, error) {
 	state := &LoadedPlugins{
 		unresolved: unresolvedType{},
 		loaded:     pluginList{},
@@ -230,25 +230,25 @@ func Load(ctx context.Context, plugins *[]*plugin.Plugin, RegisterFunc RegisterF
 		all:        map[plugin.ID]pluginList{},
 	}
 
-	if len(*plugins) == 0 {
+	if len(plugins) == 0 {
 		return ctx, state, nil
 	}
 
-	for _, p := range *plugins {
+	for _, p := range plugins {
 		node := &LoadedPlugin{
 			plugin:       p,
-			dependencies: map[*plugin.Dependency]*LoadedPlugin{},
+			dependencies: map[plugin.Dependency]*LoadedPlugin{},
 			dependents:   pluginList{},
 		}
 		if !resolve(node, &state.all) {
 			state.unresolved[node] = true
 		}
 
-		if len(p.Dependencies) == 0 {
+		if len(p.Dependencies()) == 0 {
 			state.roots = append(state.roots, node)
 		}
 
-		state.all[p.ID] = append(state.all[p.ID], node)
+		state.all[p.ID()] = append(state.all[p.ID()], node)
 
 	}
 
@@ -300,12 +300,12 @@ func (state *LoadedPlugins) Get(i int) *LoadedPlugin {
 	return state.loaded[i]
 }
 
-func (n *LoadedPlugin) Plugin() *plugin.Plugin {
+func (n *LoadedPlugin) Plugin() plugin.Plugin {
 	return n.plugin
 }
 
-func (n *LoadedPlugin) Dependencies() map[*plugin.Dependency]*LoadedPlugin {
-	var ret = map[*plugin.Dependency]*LoadedPlugin{}
+func (n *LoadedPlugin) Dependencies() map[plugin.Dependency]*LoadedPlugin {
+	var ret = map[plugin.Dependency]*LoadedPlugin{}
 	for d, dn := range n.dependencies {
 		ret[d] = dn
 	}
