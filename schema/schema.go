@@ -8,11 +8,11 @@ import (
 )
 
 type (
-	NextHandler func(context.Context, http.ResponseWriter, *http.Request)
+	ContextHandler func(context.Context, *http.Request) context.Context
 
 	PathSpec string
 
-	ServeFunc func(context.Context, http.ResponseWriter, *http.Request, NextHandler) context.Context
+	ServeFunc func(ctx context.Context, request *http.Request, parent ContextHandler, next ContextHandler) context.Context
 
 	PathHandlers map[PathSpec]ServeFunc
 
@@ -25,7 +25,9 @@ type (
 		Get(PathSpec) Router
 	}
 
-	BaseRouters map[plugin.ID]Routers
+	BaseRouters interface {
+		Get(id plugin.ID) Routers
+	}
 
 	StartupFunc  func(context.Context, BaseRouters) (context.Context, error)
 	ShutdownFunc func(context.Context) (context.Context, error)
@@ -38,5 +40,5 @@ type (
 )
 
 const (
-	RootModuleID = plugin.ID("ROOT")
+	CoreModuleID = plugin.ID("mule")
 )

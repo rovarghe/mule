@@ -6,8 +6,8 @@
             "type": "go",
             "request": "launch",
             "mode": "test",
-            "program": "${workspaceRoot}/loader",
-            "args": ["TestLoadPlugins"]
+            "program": "${workspaceRoot}/internal",
+            "args": ["TestBuiltInModules"]
 
         },
     {

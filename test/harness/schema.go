@@ -16,7 +16,7 @@ var BaseModule = schema.Module{
 
 func BaseStartupFunc(ctx context.Context, routers schema.BaseRouters) (context.Context, error) {
 	fmt.Println("Base startup executed, adding /")
-	routers[schema.RootModuleID].Default().AddRoute("/", BaseServeFunc)
+	routers.Get(schema.CoreModuleID).Default().AddRoute("/", BaseServeFunc)
 	return ctx, nil
 
 }
@@ -25,7 +25,7 @@ func BaseShutdownFunc(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func BaseServeFunc(ctx context.Context, w http.ResponseWriter, r *http.Request, n schema.NextHandler) context.Context {
+func BaseServeFunc(ctx context.Context, r *http.Request, parent schema.ContextHandler, next schema.ContextHandler) context.Context {
 	return ctx
 }
 
@@ -37,7 +37,7 @@ var MavenModule = schema.Module{
 
 func MavenStartupFunc(ctx context.Context, routers schema.BaseRouters) (context.Context, error) {
 	fmt.Println("Maven startup executed, adding /maven")
-	routers[MavenPlugin.ID()].Default().AddRoute("/maven", MavenServeFunc)
+	routers.Get(MavenPlugin.ID()).Default().AddRoute("/maven", MavenServeFunc)
 	return ctx, nil
 
 }
@@ -46,6 +46,6 @@ func MavenShutdownFunc(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func MavenServeFunc(ctx context.Context, w http.ResponseWriter, r *http.Request, n schema.NextHandler) context.Context {
+func MavenServeFunc(ctx context.Context, r *http.Request, p schema.ContextHandler, n schema.ContextHandler) context.Context {
 	return ctx
 }
