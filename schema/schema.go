@@ -12,7 +12,7 @@ type (
 
 	PathSpec string
 
-	ServeFunc func(ctx context.Context, request *http.Request, parent ContextHandler, next ContextHandler) context.Context
+	ServeFunc func(ctx context.Context, request *http.Request, parent ContextHandler, next ContextHandler) (context.Context, error)
 
 	PathHandlers map[PathSpec]ServeFunc
 

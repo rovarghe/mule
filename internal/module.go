@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/rovarghe/mule/loader"
 	"github.com/rovarghe/mule/plugin"
@@ -100,16 +101,19 @@ func notFoundServeFunc(ctx context.Context, r *http.Request, p schema.ContextHan
 
 var (
 	bootstrapModule = schema.Module{
-		Plugin:   plugin.NewPlugin("bootstrap", plugin.Version{0, 0, 0, ""}, []plugin.Dependency{}),
+		Plugin:   plugin.NewPlugin("bootstrap", plugin.Version{1, 0, 0, ""}, []plugin.Dependency{}),
 		Startup:  nil,
 		Shutdown: nil,
 	}
 
 	emptyPathSpec = schema.PathSpec("")
 
-	modules      = []schema.Module{bootstrapModule}
+	//modules      = []schema.Module{bootstrapModule}
 	moduleCtxKey = routesCtxKeyType("moduleContext")
-	moduleCtx    = moduleContext{
+)
+
+func newModuleContext() moduleContext {
+	return moduleContext{
 		allRouters: &routersImpl{
 			bootstrapModule.ID(): pathSpecRoutersList{
 				defaultPathSpec: emptyPathSpec,
@@ -124,28 +128,27 @@ var (
 			},
 		},
 	}
-)
-
-func AddModule(module schema.Module) {
-	modules = append(modules, module)
 }
 
-func LoadModules() error {
+func LoadModules(ctx context.Context, modules []schema.Module) (context.Context, error) {
+	// Add the bootstrap module to the beginning
+	// Could also have been done to the tail, but adding it to front will help it
+	// get all the modules resolve faster
+	modules = append([]schema.Module{bootstrapModule}, modules...)
 
 	var plugins = make([]plugin.Plugin, len(modules))
 
 	for i := 0; i < len(modules); i++ {
 		plugins[i] = modules[i]
 	}
-	ctx := context.WithValue(context.Background(), moduleCtxKey, moduleCtx)
-	fmt.Println("Loading")
+	ctx = context.WithValue(ctx, moduleCtxKey, newModuleContext())
+
 	ctx, loadedPlugins, err := loader.Load(ctx, plugins, startModule)
 
 	if err != nil {
 		log.Println("Load incomplete,", loadedPlugins.Count(), "modules loaded")
-		log.Println(err)
 	}
-	return err
+	return ctx, err
 
 }
 
@@ -174,4 +177,86 @@ func startModule(ctx context.Context, lp *loader.LoadedPlugin) (context.Context,
 	}
 
 	return module.Startup(ctx, mLoadingCtx)
+}
+
+type processContext struct {
+	moduleCtx                 moduleContext
+	currentModuleID           plugin.ID
+	currentRoutersForModule   pathSpecRoutersList
+	currentRoutersForPathSpec pluginServeFuncList
+	funcIndex                 int
+	uriParts                  []string
+	uriIndex                  int
+}
+
+func Process(ctx context.Context, req *http.Request) (context.Context, error) {
+	uri := req.RequestURI
+
+	moduleCtx := ctx.Value(moduleCtxKey).(moduleContext)
+
+	uriParts := strings.Split(uri, "/")
+	uriIndex := 0
+	pathSpec := schema.PathSpec(uriParts[uriIndex])
+	currentModuleID := bootstrapModule.ID()
+	currentRoutersForModule := (*moduleCtx.allRouters)[currentModuleID]
+	currentRoutersForPathSpec := currentRoutersForModule.pathSpecServFuncListMap[pathSpec]
+	funcIndex := len(currentRoutersForPathSpec)
+
+	pCtx := processContext{
+		moduleCtx:                 moduleCtx,
+		currentModuleID:           currentModuleID,
+		currentRoutersForModule:   currentRoutersForModule,
+		currentRoutersForPathSpec: currentRoutersForPathSpec,
+		funcIndex:                 funcIndex,
+		uriParts:                  uriParts,
+		uriIndex:                  uriIndex,
+	}
+
+	return servReduce(ctx, req, pCtx)
+
+}
+
+func servReduce(ctx context.Context, req *http.Request, pctx processContext) (context.Context, error) {
+	parentHandler := func(ctx context.Context, r *http.Request) (context.Context, error) {
+		pctx.funcIndex--
+		if pctx.funcIndex >= 0 {
+			pctx.funcIndex--
+			servReduce(ctx, req, pctx)
+		}
+		return ctx, nil
+	}
+
+	nextHandler := func(ctx context.Context, r *http.Request) (context.Context, error) {
+		pctx.uriIndex++
+		if pctx.uriIndex < len(pctx.uriParts) {
+			uriFrag := schema.PathSpec(pctx.uriParts[pctx.uriIndex])
+			servFuncList := pctx.currentRoutersForModule.pathSpecServFuncListMap[uriFrag]
+			funcIndex := len(servFuncList) - 1
+			if funcIndex < 0 {
+				// No sub-paths defined, we ran out of routers before uri fragments
+				// TODO: handle this in a generic way
+				return ctx, nil
+			}
+			pctx.currentRoutersForPathSpec = servFuncList
+			pctx.funcIndex = funcIndex
+			pctx.currentModuleID = servFuncList[funcIndex].id
+			pctx.currentRoutersForModule = (*pctx.moduleCtx.allRouters)[pctx.currentModuleID]
+
+			return servReduce(ctx, req, pctx)
+		} else {
+			// No sub-routes defined
+			// We ran out of paths, before sub-routes, so its just a no-op
+			return ctx, nil
+		}
+
+	}
+
+	psf := pctx.currentRoutersForPathSpec[pctx.funcIndex]
+
+	log.Println("Handling part", pctx.uriIndex, "in", pctx.uriParts, "with", psf.id)
+	return psf.serveFunc(ctx, req, parentHandler, nextHandler)
+}
+
+func Render(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
+	return ctx, nil
 }

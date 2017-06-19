@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	version0 = plugin.Version{0, 0, 0, ""}
+	version0 = plugin.Version{1, 0, 0, ""}
 
 	CoreModule = schema.Module{
 		Plugin: plugin.NewPlugin(schema.CoreModuleID, plugin.Version{1, 0, 0, ""}, []plugin.Dependency{
