@@ -25,8 +25,10 @@ func BaseShutdownFunc(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func BaseServeFunc(ctx context.Context, r *http.Request, parent schema.ContextHandler, next schema.ContextHandler) context.Context {
-	return ctx
+func BaseServeFunc(ctx context.Context,
+	r *http.Request, parent schema.ContextHandler,
+	next schema.ContextHandler) (context.Context, error) {
+	return ctx, nil
 }
 
 var MavenModule = schema.Module{
@@ -46,6 +48,7 @@ func MavenShutdownFunc(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func MavenServeFunc(ctx context.Context, r *http.Request, p schema.ContextHandler, n schema.ContextHandler) context.Context {
-	return ctx
+func MavenServeFunc(ctx context.Context,
+	r *http.Request, p schema.ContextHandler, n schema.ContextHandler) (context.Context, error) {
+	return ctx, nil
 }

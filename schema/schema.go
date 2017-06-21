@@ -8,7 +8,7 @@ import (
 )
 
 type (
-	ContextHandler func(context.Context, *http.Request) context.Context
+	ContextHandler func(context.Context, *http.Request) (context.Context, error)
 
 	PathSpec string
 

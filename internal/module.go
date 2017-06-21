@@ -94,9 +94,9 @@ type notFoundCtxKeyType string
 
 var notFoundCtxKey = notFoundCtxKeyType("notfound")
 
-func notFoundServeFunc(ctx context.Context, r *http.Request, p schema.ContextHandler, n schema.ContextHandler) context.Context {
-
-	return context.WithValue(ctx, notFoundCtxKey, nil)
+func notFoundServeFunc(ctx context.Context, r *http.Request, p schema.ContextHandler, n schema.ContextHandler) (context.Context, error) {
+	return n(ctx, r)
+	//return context.WithValue(ctx, notFoundCtxKey, nil), nil
 }
 
 var (
@@ -200,7 +200,7 @@ func Process(ctx context.Context, req *http.Request) (context.Context, error) {
 	currentModuleID := bootstrapModule.ID()
 	currentRoutersForModule := (*moduleCtx.allRouters)[currentModuleID]
 	currentRoutersForPathSpec := currentRoutersForModule.pathSpecServFuncListMap[pathSpec]
-	funcIndex := len(currentRoutersForPathSpec)
+	funcIndex := len(currentRoutersForPathSpec) - 1
 
 	pCtx := processContext{
 		moduleCtx:                 moduleCtx,

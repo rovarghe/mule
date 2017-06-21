@@ -23,8 +23,8 @@ var (
 	}
 )
 
-func coreHandler(ctx context.Context, r *http.Request, parent schema.ContextHandler, next schema.ContextHandler) context.Context {
-	return nil
+func coreHandler(ctx context.Context, r *http.Request, parent schema.ContextHandler, next schema.ContextHandler) (context.Context, error) {
+	return ctx, nil
 }
 
 func coreStartupFunc(ctx context.Context, base schema.BaseRouters) (context.Context, error) {
