@@ -12,7 +12,7 @@ type (
 
 	PathSpec string
 
-	ServeFunc func(ctx context.Context, request *http.Request, parent ContextHandler, next ContextHandler) (context.Context, error)
+	ServeFunc func(ctx context.Context, request *http.Request, parent ContextHandler) (context.Context, error)
 
 	PathHandlers map[PathSpec]ServeFunc
 
@@ -37,8 +37,16 @@ type (
 		Startup  StartupFunc
 		Shutdown ShutdownFunc
 	}
+
+	// moduleContextKeyType string
+
+	// ModuleContext interface {
+	// 	Set(key interface{}, value interface{})
+	// 	Value(key interface{}) interface{}
+	// }
 )
 
 const (
-	CoreModuleID = plugin.ID("mule")
+	RootModuleID = plugin.ID("bootstrap")
+	// ModuleContextKey = moduleContextKeyType("moduleContextKey")
 )
