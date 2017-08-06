@@ -10,6 +10,32 @@ import (
 	"github.com/rovarghe/mule/schema"
 )
 
+type MockHttpWriter struct {
+	MockHeader http.Header
+	bytes      *[]byte
+}
+
+func (w *MockHttpWriter) Write(b []byte) (int, error) {
+	var bytes []byte
+	if w.bytes == nil {
+		bytes = b
+	} else {
+		bytes = append(*w.bytes, b...)
+	}
+
+	w.bytes = &bytes
+
+	return len(b), nil
+
+}
+
+func (w MockHttpWriter) WriteHeader(i int) {
+}
+
+func (w MockHttpWriter) Header() http.Header {
+	return w.MockHeader
+}
+
 func onlyCoreModule() []schema.Module {
 	return []schema.Module{builtin.CoreModule}
 }
@@ -42,16 +68,25 @@ func TestProcess(t *testing.T) {
 	ctx, err = Process(ctx, &http.Request{
 		RequestURI: "/",
 	})
+}
 
-	fmt.Println("Process returned", ctx.Value("core"))
-	fmt.Println("Process returned", ctx.Value("about"))
+func TestProcessAndRender(t *testing.T) {
 
-	ctx, err = LoadModules(context.Background(), coreAndAboutModules())
+	ctx, err := LoadModules(context.Background(), coreAndAboutModules())
+	if err != nil {
+		t.Error(err)
+		return
+	}
 
-	ctx, err = Process(ctx, &http.Request{
+	httpReq := &http.Request{
 		RequestURI: "/about",
-	})
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+		},
+	}
+	ctx, err = Process(ctx, httpReq)
+	mockWriter := MockHttpWriter{}
+	ctx, err = Render(ctx, httpReq, &mockWriter)
 
-	fmt.Println("Second process returned", ctx.Value("core"))
-	fmt.Println("Second process returned", ctx.Value("about"))
+	fmt.Println(string(*mockWriter.bytes))
 }

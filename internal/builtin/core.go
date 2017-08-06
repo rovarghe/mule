@@ -2,7 +2,8 @@ package builtin
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/rovarghe/mule/plugin"
@@ -30,33 +31,58 @@ var (
 	}
 )
 
-func coreHandler(ctx context.Context, r *http.Request, parent schema.ContextHandler) (context.Context, error) {
-	fmt.Println("Calling parent in core")
+func coreHandler(ctx context.Context, r *http.Request, parent schema.ContextHandler) (interface{}, error) {
+
 	ctx, err := parent(ctx, r)
 	if err != nil {
 		return ctx, err
 	}
-	fmt.Println("Hello World")
-	return context.WithValue(ctx, "core", "Hello world"), nil
+
+	return nil, nil
+}
+
+func coreRenderer(ctx context.Context, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (interface{}, error) {
+	intf := ctx.Value(schema.RenderResultKey)
+
+	if intf != nil && r.Header.Get("Content-Type") == "application/json" {
+
+		js, err := json.Marshal(intf)
+		if err != nil {
+			log.Fatal("Cannot convert ", intf, " to json")
+			return []byte("Internal Server Error"), err
+
+		}
+
+		ctx = context.WithValue(ctx, schema.RenderResultKey, js)
+		return parent(ctx, r, w)
+
+	}
+
+	return ctx, nil
 }
 
 func coreStartupFunc(ctx context.Context, base schema.BaseRouters) (context.Context, error) {
 	routers := base.Get(schema.RootModuleID)
-	routers.Default().AddRoute(schema.PathSpec(""), coreHandler)
+	routers.Default().AddRoute(schema.PathSpec(""), coreHandler, coreRenderer)
 	return ctx, nil
 }
 
 func coreShutdownFunc(ctx context.Context) (context.Context, error) {
+
 	return nil, nil
 }
 
 func aboutStartupFunc(ctx context.Context, base schema.BaseRouters) (context.Context, error) {
 	routers := base.Get(CoreModule.ID())
-	routers.Default().AddRoute(schema.PathSpec("about"), aboutHandler)
+	routers.Default().AddRoute(schema.PathSpec("about"), aboutHandler, aboutRenderer)
 	return ctx, nil
 }
 
-func aboutHandler(ctx context.Context, r *http.Request, parent schema.ContextHandler) (context.Context, error) {
-	fmt.Println("About")
-	return context.WithValue(ctx, "about", "About the world"), nil
+func aboutHandler(ctx context.Context, r *http.Request, parent schema.ContextHandler) (interface{}, error) {
+
+	return map[string]string{"msg": "About the world"}, nil
+}
+
+func aboutRenderer(ctx context.Context, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (interface{}, error) {
+	return ctx.Value(schema.ProcessResultKey), nil
 }

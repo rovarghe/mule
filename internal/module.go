@@ -17,8 +17,9 @@ type (
 	routersImpl      map[plugin.ID]pathSpecRoutersList
 
 	pluginServeFunc struct {
-		id        plugin.ID
-		serveFunc schema.ServeFunc
+		id         plugin.ID
+		serveFunc  schema.ServeFunc
+		renderFunc schema.RenderFunc
 	}
 
 	pluginServeFuncList []pluginServeFunc
@@ -72,7 +73,7 @@ func (psr parentLoadingContext) Get(ps schema.PathSpec) schema.Router {
 	return pathSpecLoadingContext{parentLoadingContext: psr, pathSpec: ps}
 }
 
-func (psr pathSpecLoadingContext) AddRoute(ps schema.PathSpec, sf schema.ServeFunc) {
+func (psr pathSpecLoadingContext) AddRoute(ps schema.PathSpec, sf schema.ServeFunc, rf schema.RenderFunc) {
 	currentPluginId := psr.loadedPlugin.Plugin().ID()
 	all := *psr.allRouters
 	psrl := all[psr.parentId]
@@ -82,8 +83,9 @@ func (psr pathSpecLoadingContext) AddRoute(ps schema.PathSpec, sf schema.ServeFu
 	}
 
 	psf := pluginServeFunc{
-		id:        currentPluginId,
-		serveFunc: sf,
+		id:         currentPluginId,
+		serveFunc:  sf,
+		renderFunc: rf,
 	}
 	if psrl.pathSpecServFuncListMap == nil {
 		psrl.pathSpecServFuncListMap = map[schema.PathSpec]pluginServeFuncList{}
@@ -120,12 +122,27 @@ func (pr pluginLoadingContext) Get(id plugin.ID) schema.Routers {
 	return parentLoadingContext{pluginLoadingContext: pr, parentId: id}
 }
 
-type notFoundCtxKeyType string
+type notFoundType struct{}
 
-var notFoundCtxKey = notFoundCtxKeyType("notfound")
+func notFoundServeFunc(ctx context.Context, r *http.Request, p schema.ContextHandler) (interface{}, error) {
+	return notFoundType{}, nil
+}
 
-func notFoundServeFunc(ctx context.Context, r *http.Request, p schema.ContextHandler) (context.Context, error) {
-	return context.WithValue(ctx, notFoundCtxKey, nil), nil
+func defaultRenderer(ctx context.Context, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (interface{}, error) {
+
+	intf := ctx.Value(schema.RenderResultKey)
+
+	switch x := intf.(type) {
+	case notFoundType:
+		w.Write([]byte("Not Found"))
+	case []byte:
+		w.Write(x)
+	default:
+		panic("Cannot handle intf of type unknown")
+	}
+
+	return nil, nil
+
 }
 
 var (
@@ -149,8 +166,9 @@ func newModuleLoadingContext() moduleLoadingContext {
 				pathSpecServFuncListMap: map[schema.PathSpec]pluginServeFuncList{
 					emptyPathSpec: pluginServeFuncList{
 						pluginServeFunc{
-							id:        bootstrapModule.ID(),
-							serveFunc: notFoundServeFunc,
+							id:         bootstrapModule.ID(),
+							serveFunc:  notFoundServeFunc,
+							renderFunc: defaultRenderer,
 						},
 					},
 				},
@@ -160,10 +178,6 @@ func newModuleLoadingContext() moduleLoadingContext {
 }
 
 func LoadModules(ctx context.Context, modules []schema.Module) (context.Context, error) {
-	// Add the bootstrap module to the beginning
-	// Could also have been done to the tail, but adding it to front will help it
-	// get all the modules resolve faster
-	//modules = append([]schema.Module{bootstrapModule}, modules...)
 
 	var plugins = make([]plugin.Plugin, len(modules))
 
@@ -178,7 +192,6 @@ func LoadModules(ctx context.Context, modules []schema.Module) (context.Context,
 		log.Println("Load incomplete,", loadedPlugins.Count(), "modules loaded")
 	}
 
-	fmt.Println(*ctx.Value(moduleCtxKey).(moduleLoadingContext).allRouters)
 	return ctx, err
 
 }
@@ -221,6 +234,13 @@ type processContext struct {
 	depth                     int
 }
 
+type processContextKeyType string
+type renderContextKeyType string
+
+var processContextKey = processContextKeyType("processContext")
+
+var renderContextKey = renderContextKeyType("renderContext")
+
 func Process(ctx context.Context, req *http.Request) (context.Context, error) {
 	uri := req.RequestURI
 
@@ -247,12 +267,15 @@ func Process(ctx context.Context, req *http.Request) (context.Context, error) {
 		uriIndex:                  uriIndex,
 	}
 
-	return servReduce(ctx, req, pCtx)
+	pctxStack, ctx, err := servReduce(ctx, req, pCtx, []processContext{})
+	ctx = context.WithValue(ctx, processContextKey, pctxStack)
+	return ctx, err
 
 }
 
-func servReduce(ctx context.Context, req *http.Request, pctx processContext) (context.Context, error) {
-	fmt.Printf("ServReduce %+v\n", pctx)
+func servReduce(ctx context.Context, req *http.Request,
+	pctx processContext, pctxStack []processContext) ([]processContext, context.Context, error) {
+
 	parentHandler := func(ctx context.Context, r *http.Request) (context.Context, error) {
 		if pctx.funcIndex == 0 {
 			return ctx, nil
@@ -261,28 +284,40 @@ func servReduce(ctx context.Context, req *http.Request, pctx processContext) (co
 		parentCtx := pctx
 		parentCtx.depth++
 		parentCtx.funcIndex--
-		return servReduce(ctx, req, parentCtx)
+
+		// Stack does not grow when calling parent
+		_, ctx, err := servReduce(ctx, req, parentCtx, pctxStack)
+		return ctx, err
 	}
 
 	psf := pctx.currentRoutersForPathSpec[pctx.funcIndex]
 
-	log.Println("Handling part", pctx.uriIndex, "in", pctx.uriParts, "with", psf.id)
-	ctx, err := psf.serveFunc(ctx, req, parentHandler)
-	if err != nil {
-		return ctx, err
+	intf, err := psf.serveFunc(ctx, req, parentHandler)
+
+	ctx, ok := intf.(context.Context)
+	if !ok {
+		ctx = context.WithValue(ctx, schema.ProcessResultKey, intf)
 	}
 
-	if pctx.depth > 0 {
-		return ctx, nil
+	if err != nil {
+		return pctxStack, ctx, err
 	}
+
+	// 'Next' processing starts here.
+	// Proceed only if not processing a parent call.
+	if pctx.depth > 0 {
+		return pctxStack, ctx, nil
+	}
+	// Add current pctx to stack
+	pctxStack = append(pctxStack, pctx)
 
 	currentUriIndex := pctx.uriIndex + 1
 
 	// If no more URI parts to handle
 	if currentUriIndex == len(pctx.uriParts) {
 		// We ran out of paths, before sub-routes, so just return current ctx
-		log.Printf("Ran out of paths, returning nil")
-		return ctx, nil
+
+		return pctxStack, ctx, nil
 	}
 
 	uriFrag := schema.PathSpec(pctx.uriParts[currentUriIndex])
@@ -299,15 +334,60 @@ func servReduce(ctx context.Context, req *http.Request, pctx processContext) (co
 			pctx.currentRoutersForPathSpec = servFuncList
 			pctx.funcIndex = funcIndex
 			pctx.uriIndex = currentUriIndex
-			fmt.Println("Calling nex in")
-			return servReduce(ctx, req, pctx)
+
+			return servReduce(ctx, req, pctx, pctxStack)
 		}
 	}
 
-	fmt.Println("Calling notfound")
-	return notFoundServeFunc(ctx, req, nil)
+	intf, err = notFoundServeFunc(ctx, req, nil)
+	return pctxStack, intf.(context.Context), err
 }
 
-func Render(ctx context.Context, w http.ResponseWriter, req *http.Request) (context.Context, error) {
-	return ctx, nil
+func Render(ctx context.Context, req *http.Request, w http.ResponseWriter) (context.Context, error) {
+	pCtxStack, ok := ctx.Value(processContextKey).([]processContext)
+	if !ok {
+		panic("Invalid context. Render called without a preceding Process")
+	}
+	var err error
+
+	for i := len(pCtxStack) - 1; i >= 0; i-- {
+		pctx := pCtxStack[i]
+		pctx.funcIndex = len(pctx.currentRoutersForPathSpec) - 1
+		ctx, err = renderer(ctx, req, w, pctx)
+		if err != nil {
+			break
+		}
+
+	}
+
+	return ctx, err
+
+}
+
+func renderer(ctx context.Context, req *http.Request, w http.ResponseWriter, pctx processContext) (context.Context, error) {
+
+	renderFunc := pctx.currentRoutersForPathSpec[pctx.funcIndex].renderFunc
+
+	parentRenderer := func(ctx context.Context, r *http.Request, w http.ResponseWriter) (context.Context, error) {
+		if pctx.funcIndex == 0 {
+			return ctx, nil
+		}
+
+		parentCtx := pctx
+		parentCtx.funcIndex--
+		parentCtx.depth++
+		return renderer(ctx, req, w, parentCtx)
+
+	}
+
+	intf, err := renderFunc(ctx, req, w, parentRenderer)
+
+	ctxCast, ok := intf.(context.Context)
+	if ok {
+		ctx = ctxCast
+	} else {
+		ctx = context.WithValue(ctx, schema.RenderResultKey, intf)
+	}
+
+	return ctx, err
 }
