@@ -7,7 +7,7 @@
             "request": "launch",
             "mode": "test",
             "program": "${workspaceRoot}/internal",
-            "args": ["TestBuiltInModules"]
+            "args": ["TestProcessAndRender"]
 
         },
     {

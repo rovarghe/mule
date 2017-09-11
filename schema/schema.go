@@ -8,14 +8,16 @@ import (
 )
 
 type (
-	ContextHandler func(context.Context, *http.Request) (context.Context, error)
-	Renderer       func(context.Context, *http.Request, http.ResponseWriter) (context.Context, error)
+	State interface{}
+
+	ContextHandler func(State, *http.Request) (State, error)
+	Renderer       func(State, *http.Request, http.ResponseWriter) (State, error)
 
 	PathSpec string
 
-	ServeFunc func(ctx context.Context, request *http.Request, parent ContextHandler) (interface{}, error)
+	ServeFunc func(state State, request *http.Request, parent ContextHandler) (State, error)
 
-	RenderFunc func(ctx context.Context, request *http.Request, response http.ResponseWriter, parent Renderer) (interface{}, error)
+	RenderFunc func(state State, request *http.Request, response http.ResponseWriter, parent Renderer) (State, error)
 
 	PathHandlers map[PathSpec]ServeFunc
 
@@ -48,13 +50,15 @@ type (
 	// 	Value(key interface{}) interface{}
 	// }
 
-	processResultKeyType string
-	renderResultKeyType  string
+	processResultKeyType  string
+	processContextKeyType string
+	renderResultKeyType   string
 )
 
 const (
-	RootModuleID     = plugin.ID("bootstrap")
-	ProcessResultKey = processResultKeyType("result")
-	RenderResultKey  = renderResultKeyType("rendered")
+	RootModuleID      = plugin.ID("bootstrap")
+	ProcessResultKey  = processResultKeyType("result")
+	ProcessContextKey = processContextKeyType("processContext")
+	//RenderResultKey  = renderResultKeyType("rendered")
 	// ModuleContextKey = moduleContextKeyType("moduleContextKey")
 )

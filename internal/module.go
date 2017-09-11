@@ -124,25 +124,19 @@ func (pr pluginLoadingContext) Get(id plugin.ID) schema.Routers {
 
 type notFoundType struct{}
 
-func notFoundServeFunc(ctx context.Context, r *http.Request, p schema.ContextHandler) (interface{}, error) {
+func notFoundServeFunc(state schema.State, r *http.Request, p schema.ContextHandler) (schema.State, error) {
 	return notFoundType{}, nil
 }
 
-func defaultRenderer(ctx context.Context, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (interface{}, error) {
+func defaultRenderer(state schema.State, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (schema.State, error) {
 
-	intf := ctx.Value(schema.RenderResultKey)
-
-	switch x := intf.(type) {
-	case notFoundType:
-		w.Write([]byte("Not Found"))
-	case []byte:
-		w.Write(x)
-	default:
-		panic("Cannot handle intf of type unknown")
+	if _, ok := state.(notFoundType); ok {
+		http.NotFound(w, r)
+	} else {
+		panic("Cannot handle state of type unknown")
 	}
 
 	return nil, nil
-
 }
 
 var (
@@ -241,7 +235,7 @@ var processContextKey = processContextKeyType("processContext")
 
 var renderContextKey = renderContextKeyType("renderContext")
 
-func Process(ctx context.Context, req *http.Request) (context.Context, error) {
+func Process(ctx context.Context, req *http.Request) (schema.State, []processContext, error) {
 	uri := req.RequestURI
 
 	moduleCtx := ctx.Value(moduleCtxKey).(moduleLoadingContext)
@@ -267,18 +261,18 @@ func Process(ctx context.Context, req *http.Request) (context.Context, error) {
 		uriIndex:                  uriIndex,
 	}
 
-	pctxStack, ctx, err := servReduce(ctx, req, pCtx, []processContext{})
-	ctx = context.WithValue(ctx, processContextKey, pctxStack)
-	return ctx, err
+	pctxStack, state, err := servReduce(ctx, req, pCtx, []processContext{})
+
+	return state, pctxStack, err
 
 }
 
-func servReduce(ctx context.Context, req *http.Request,
-	pctx processContext, pctxStack []processContext) ([]processContext, context.Context, error) {
+func servReduce(state schema.State, req *http.Request,
+	pctx processContext, pctxStack []processContext) ([]processContext, schema.State, error) {
 
-	parentHandler := func(ctx context.Context, r *http.Request) (context.Context, error) {
+	parentHandler := func(state schema.State, r *http.Request) (schema.State, error) {
 		if pctx.funcIndex == 0 {
-			return ctx, nil
+			return state, nil
 		}
 		// Make a copy
 		parentCtx := pctx
@@ -286,27 +280,22 @@ func servReduce(ctx context.Context, req *http.Request,
 		parentCtx.funcIndex--
 
 		// Stack does not grow when calling parent
-		_, ctx, err := servReduce(ctx, req, parentCtx, pctxStack)
-		return ctx, err
+		_, state, err := servReduce(state, req, parentCtx, pctxStack)
+		return state, err
 	}
 
 	psf := pctx.currentRoutersForPathSpec[pctx.funcIndex]
 
-	intf, err := psf.serveFunc(ctx, req, parentHandler)
-
-	ctx, ok := intf.(context.Context)
-	if !ok {
-		ctx = context.WithValue(ctx, schema.ProcessResultKey, intf)
-	}
+	state, err := psf.serveFunc(state, req, parentHandler)
 
 	if err != nil {
-		return pctxStack, ctx, err
+		return pctxStack, state, err
 	}
 
 	// 'Next' processing starts here.
 	// Proceed only if not processing a parent call.
 	if pctx.depth > 0 {
-		return pctxStack, ctx, nil
+		return pctxStack, state, nil
 	}
 	// Add current pctx to stack
 	pctxStack = append(pctxStack, pctx)
@@ -317,7 +306,7 @@ func servReduce(ctx context.Context, req *http.Request,
 	if currentUriIndex == len(pctx.uriParts) {
 		// We ran out of paths, before sub-routes, so just return current ctx
 
-		return pctxStack, ctx, nil
+		return pctxStack, state, nil
 	}
 
 	uriFrag := schema.PathSpec(pctx.uriParts[currentUriIndex])
@@ -335,59 +324,48 @@ func servReduce(ctx context.Context, req *http.Request,
 			pctx.funcIndex = funcIndex
 			pctx.uriIndex = currentUriIndex
 
-			return servReduce(ctx, req, pctx, pctxStack)
+			return servReduce(state, req, pctx, pctxStack)
 		}
 	}
 
-	intf, err = notFoundServeFunc(ctx, req, nil)
-	return pctxStack, intf.(context.Context), err
+	state, err = notFoundServeFunc(state, req, nil)
+	return pctxStack, state, err
 }
 
-func Render(ctx context.Context, req *http.Request, w http.ResponseWriter) (context.Context, error) {
-	pCtxStack, ok := ctx.Value(processContextKey).([]processContext)
-	if !ok {
-		panic("Invalid context. Render called without a preceding Process")
-	}
+func Render(state schema.State, pCtxStack []processContext, req *http.Request, w http.ResponseWriter) (schema.State, error) {
+
 	var err error
 
 	for i := len(pCtxStack) - 1; i >= 0; i-- {
 		pctx := pCtxStack[i]
 		pctx.funcIndex = len(pctx.currentRoutersForPathSpec) - 1
-		ctx, err = renderer(ctx, req, w, pctx)
+		state, err = renderer(state, req, w, pctx)
 		if err != nil {
 			break
 		}
 
 	}
 
-	return ctx, err
-
+	return state, err
 }
 
-func renderer(ctx context.Context, req *http.Request, w http.ResponseWriter, pctx processContext) (context.Context, error) {
+func renderer(state schema.State, req *http.Request, w http.ResponseWriter, pctx processContext) (schema.State, error) {
 
 	renderFunc := pctx.currentRoutersForPathSpec[pctx.funcIndex].renderFunc
 
-	parentRenderer := func(ctx context.Context, r *http.Request, w http.ResponseWriter) (context.Context, error) {
+	parentRenderer := func(state schema.State, r *http.Request, w http.ResponseWriter) (schema.State, error) {
 		if pctx.funcIndex == 0 {
-			return ctx, nil
+			return state, nil
 		}
 
 		parentCtx := pctx
 		parentCtx.funcIndex--
 		parentCtx.depth++
-		return renderer(ctx, req, w, parentCtx)
+		return renderer(state, req, w, parentCtx)
 
 	}
 
-	intf, err := renderFunc(ctx, req, w, parentRenderer)
+	state, err := renderFunc(state, req, w, parentRenderer)
 
-	ctxCast, ok := intf.(context.Context)
-	if ok {
-		ctx = ctxCast
-	} else {
-		ctx = context.WithValue(ctx, schema.RenderResultKey, intf)
-	}
-
-	return ctx, err
+	return state, err
 }

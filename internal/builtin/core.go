@@ -3,6 +3,7 @@ package builtin
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 
@@ -31,34 +32,33 @@ var (
 	}
 )
 
-func coreHandler(ctx context.Context, r *http.Request, parent schema.ContextHandler) (interface{}, error) {
+func coreHandler(state schema.State, r *http.Request, parent schema.ContextHandler) (schema.State, error) {
 
-	ctx, err := parent(ctx, r)
-	if err != nil {
-		return ctx, err
-	}
+	state, err := parent(state, r)
 
-	return nil, nil
+	return state, err
 }
 
-func coreRenderer(ctx context.Context, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (interface{}, error) {
-	intf := ctx.Value(schema.RenderResultKey)
+func coreRenderer(state schema.State, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (schema.State, error) {
 
-	if intf != nil && r.Header.Get("Content-Type") == "application/json" {
-
-		js, err := json.Marshal(intf)
-		if err != nil {
-			log.Fatal("Cannot convert ", intf, " to json")
-			return []byte("Internal Server Error"), err
+	if state != nil {
+		contentType := r.Header.Get("Accept")
+		switch contentType {
+		case "application/json":
+			js, err := json.Marshal(state)
+			if err != nil {
+				log.Fatal("Cannot convert ", state, " to json")
+				return []byte("Internal Server Error"), err
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(js)
+		default:
+			panic(fmt.Sprintf("Unable to handle content type %s", contentType))
 
 		}
-
-		ctx = context.WithValue(ctx, schema.RenderResultKey, js)
-		return parent(ctx, r, w)
-
 	}
 
-	return ctx, nil
+	return state, nil
 }
 
 func coreStartupFunc(ctx context.Context, base schema.BaseRouters) (context.Context, error) {
@@ -78,11 +78,11 @@ func aboutStartupFunc(ctx context.Context, base schema.BaseRouters) (context.Con
 	return ctx, nil
 }
 
-func aboutHandler(ctx context.Context, r *http.Request, parent schema.ContextHandler) (interface{}, error) {
+func aboutHandler(state schema.State, r *http.Request, parent schema.ContextHandler) (schema.State, error) {
 
 	return map[string]string{"msg": "About the world"}, nil
 }
 
-func aboutRenderer(ctx context.Context, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (interface{}, error) {
-	return ctx.Value(schema.ProcessResultKey), nil
+func aboutRenderer(state schema.State, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (schema.State, error) {
+	return state, nil
 }
