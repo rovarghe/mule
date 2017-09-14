@@ -62,7 +62,7 @@ func SetPathParam(ctx context.Context, param string, value string) context.Conte
 
 // DefaultNextHandler writes 404 to the writer
 func DefaultNextHandler(ctx context.Context, w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(404)
+	http.NotFound(w, r)
 }
 
 func extractPathParameter(str string) *pathParameter {

@@ -10,19 +10,31 @@ import (
 type (
 	State interface{}
 
-	ContextHandler func(State, *http.Request) (State, error)
-	Renderer       func(State, *http.Request, http.ResponseWriter) (State, error)
+	StateReducerContext interface {
+		URI() PathSpec
+		PathParameters() map[string]string
+		Final() bool
+	}
+
+	RenderReducerContext interface {
+		URI() PathSpec
+		//PathParameters() map[string]string
+		Final() bool
+	}
+
+	DefaultStateReducer  func(State, *http.Request) (State, error)
+	DefaultRenderReducer func(State, *http.Request, http.ResponseWriter) (State, error)
 
 	PathSpec string
 
-	ServeFunc func(state State, request *http.Request, parent ContextHandler) (State, error)
+	StateReducer func(state State, context StateReducerContext, request *http.Request, parent DefaultStateReducer) (State, error)
 
-	RenderFunc func(state State, request *http.Request, response http.ResponseWriter, parent Renderer) (State, error)
+	RenderReducer func(state State, context RenderReducerContext, request *http.Request, response http.ResponseWriter, parent DefaultRenderReducer) (State, error)
 
-	PathHandlers map[PathSpec]ServeFunc
+	PathHandlers map[PathSpec]StateReducer
 
 	Router interface {
-		AddRoute(PathSpec, ServeFunc, RenderFunc)
+		AddRoute(PathSpec, StateReducer, RenderReducer)
 	}
 
 	Routers interface {

@@ -32,14 +32,14 @@ var (
 	}
 )
 
-func coreHandler(state schema.State, r *http.Request, parent schema.ContextHandler) (schema.State, error) {
+func coreHandler(state schema.State, ctx schema.StateReducerContext, r *http.Request, parent schema.DefaultStateReducer) (schema.State, error) {
 
 	state, err := parent(state, r)
 
 	return state, err
 }
 
-func coreRenderer(state schema.State, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (schema.State, error) {
+func coreRenderer(state schema.State, ctx schema.RenderReducerContext, r *http.Request, w http.ResponseWriter, parent schema.DefaultRenderReducer) (schema.State, error) {
 
 	if state != nil {
 		contentType := r.Header.Get("Accept")
@@ -78,11 +78,11 @@ func aboutStartupFunc(ctx context.Context, base schema.BaseRouters) (context.Con
 	return ctx, nil
 }
 
-func aboutHandler(state schema.State, r *http.Request, parent schema.ContextHandler) (schema.State, error) {
+func aboutHandler(state schema.State, ctx schema.StateReducerContext, r *http.Request, parent schema.DefaultStateReducer) (schema.State, error) {
 
 	return map[string]string{"msg": "About the world"}, nil
 }
 
-func aboutRenderer(state schema.State, r *http.Request, w http.ResponseWriter, parent schema.Renderer) (schema.State, error) {
+func aboutRenderer(state schema.State, ctx schema.RenderReducerContext, r *http.Request, w http.ResponseWriter, parent schema.DefaultRenderReducer) (schema.State, error) {
 	return state, nil
 }

@@ -6,8 +6,8 @@
             "type": "go",
             "request": "launch",
             "mode": "test",
-            "program": "${workspaceRoot}/internal",
-            "args": ["TestProcessAndRender"]
+            "program": "${workspaceRoot}/router",
+            "args": []
 
         },
     {

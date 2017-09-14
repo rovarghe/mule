@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/rovarghe/mule/internal/builtin"
@@ -48,22 +49,19 @@ func TestProcess(t *testing.T) {
 
 func TestProcessAndRender(t *testing.T) {
 
-	ctx, err := LoadModules(context.Background(), coreAndAboutModules())
+	loadingCtx, err := LoadModules(context.Background(), coreAndAboutModules())
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	httpReq := &http.Request{
-		RequestURI: "/about",
-		Header: http.Header{
-			"Accept": []string{"application/json"},
-		},
-	}
-	state, pctxStack, err := Process(ctx, httpReq)
+	httpReq := httptest.NewRequest("GET", "/about", strings.NewReader(""))
+	httpReq.Header.Add("Accept", "application/json")
+
+	state, processCtx, err := Process(loadingCtx, httpReq)
 
 	mockWriter := httptest.NewRecorder()
-	state, err = Render(state, pctxStack, httpReq, mockWriter)
+	state, err = Render(state, processCtx, httpReq, mockWriter)
 
 	fmt.Println(mockWriter.HeaderMap.Write(os.Stdout))
 	fmt.Println(mockWriter.Body.String())
