@@ -123,11 +123,11 @@ func (pr pluginLoadingContext) Get(id plugin.ID) schema.Routers {
 
 type notFoundType struct{}
 
-func notFoundServeFunc(state schema.State, ctx schema.StateReducerContext, r *http.Request, p schema.DefaultStateReducer) (schema.State, error) {
+func notFoundServeFunc(state schema.State, ctx schema.ReducerContext, r *http.Request, p schema.DefaultStateReducer) (schema.State, error) {
 	return notFoundType{}, nil
 }
 
-func defaultRenderer(state schema.State, ctx schema.RenderReducerContext, r *http.Request, w http.ResponseWriter, parent schema.DefaultRenderReducer) (schema.State, error) {
+func defaultRenderer(state schema.State, ctx schema.ReducerContext, r *http.Request, w http.ResponseWriter, parent schema.DefaultRenderReducer) (schema.State, error) {
 
 	if _, ok := state.(notFoundType); ok {
 		http.NotFound(w, r)

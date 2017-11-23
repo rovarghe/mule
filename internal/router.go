@@ -245,6 +245,10 @@ func (rctx renderContext) Final() bool {
 	return rctx.uriIndex == 0
 }
 
+func (rctx renderContext) PathParameters() map[string]string {
+	return map[string]string{}
+}
+
 func Render(state schema.State, processCtx context.Context, req *http.Request, w http.ResponseWriter) (schema.State, error) {
 
 	var err error

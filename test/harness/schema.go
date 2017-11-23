@@ -25,11 +25,11 @@ func BaseShutdownFunc(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func BaseServeFunc(state schema.State, ctx schema.StateReducerContext, r *http.Request, parent schema.DefaultStateReducer) (schema.State, error) {
+func BaseServeFunc(state schema.State, ctx schema.ReducerContext, r *http.Request, parent schema.DefaultStateReducer) (schema.State, error) {
 	return state, nil
 }
 
-func BaseRenderFunc(state schema.State, ctx schema.RenderReducerContext, r *http.Request, w http.ResponseWriter, parent schema.DefaultRenderReducer) (schema.State, error) {
+func BaseRenderFunc(state schema.State, ctx schema.ReducerContext, r *http.Request, w http.ResponseWriter, parent schema.DefaultRenderReducer) (schema.State, error) {
 	return state, nil
 }
 
@@ -50,11 +50,11 @@ func MavenShutdownFunc(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
-func MavenServeFunc(state schema.State, ctx schema.StateReducerContext, r *http.Request, parent schema.DefaultStateReducer) (schema.State, error) {
+func MavenServeFunc(state schema.State, ctx schema.ReducerContext, r *http.Request, parent schema.DefaultStateReducer) (schema.State, error) {
 	return ctx, nil
 }
 
-func MavenRenderFunc(state schema.State, ctx schema.RenderReducerContext, r *http.Request, w http.ResponseWriter, parent schema.DefaultRenderReducer) (schema.State, error) {
+func MavenRenderFunc(state schema.State, ctx schema.ReducerContext, r *http.Request, w http.ResponseWriter, parent schema.DefaultRenderReducer) (schema.State, error) {
 
 	return ctx, nil
 }
