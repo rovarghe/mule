@@ -46,13 +46,22 @@ type (
 		Get(id plugin.ID) Routers
 	}
 
-	StartupFunc  func(context.Context, BaseRouters) (context.Context, error)
-	ShutdownFunc func(context.Context) (context.Context, error)
+	Starter interface {
+		Start(context.Context, BaseRouters) (context.Context, error)
+	}
+
+	Stopper interface {
+		Stop(context.Context) (context.Context, error)
+	}
+
+	StarterFunc func(context.Context, BaseRouters) (context.Context, error)
+
+	StopperFunc func(context.Context) (context.Context, error)
 
 	Module struct {
 		plugin.Plugin
-		Startup  StartupFunc
-		Shutdown ShutdownFunc
+		Starter Starter
+		Stopper Stopper
 	}
 
 	// moduleContextKeyType string
@@ -74,3 +83,11 @@ const (
 	//RenderResultKey  = renderResultKeyType("rendered")
 	// ModuleContextKey = moduleContextKeyType("moduleContextKey")
 )
+
+func (f StarterFunc) Start(c context.Context, b BaseRouters) (context.Context, error) {
+	return f(c, b)
+}
+
+func (f StopperFunc) Stop(c context.Context) (context.Context, error) {
+	return f(c)
+}

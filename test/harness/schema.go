@@ -9,19 +9,19 @@ import (
 )
 
 var BaseModule = schema.Module{
-	Plugin:   BasePlugin,
-	Startup:  BaseStartupFunc,
-	Shutdown: BaseShutdownFunc,
+	Plugin:  BasePlugin,
+	Starter: schema.StarterFunc(BaseStarterFunc),
+	Stopper: schema.StopperFunc(BaseStopperFunc),
 }
 
-func BaseStartupFunc(ctx context.Context, routers schema.BaseRouters) (context.Context, error) {
+func BaseStarterFunc(ctx context.Context, routers schema.BaseRouters) (context.Context, error) {
 	fmt.Println("Base startup executed, adding /")
 	routers.Get(schema.RootModuleID).Default().AddRoute("/", BaseServeFunc, BaseRenderFunc)
 	return ctx, nil
 
 }
 
-func BaseShutdownFunc(ctx context.Context) (context.Context, error) {
+func BaseStopperFunc(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 
@@ -34,19 +34,19 @@ func BaseRenderFunc(state schema.State, ctx schema.ReducerContext, r *http.Reque
 }
 
 var MavenModule = schema.Module{
-	Plugin:   MavenPlugin,
-	Startup:  MavenStartupFunc,
-	Shutdown: MavenShutdownFunc,
+	Plugin:  MavenPlugin,
+	Starter: schema.StarterFunc(MavenStarterFunc),
+	Stopper: schema.StopperFunc(MavenStopperFunc),
 }
 
-func MavenStartupFunc(ctx context.Context, routers schema.BaseRouters) (context.Context, error) {
+func MavenStarterFunc(ctx context.Context, routers schema.BaseRouters) (context.Context, error) {
 	fmt.Println("Maven startup executed, adding /maven")
 	routers.Get(MavenPlugin.ID()).Default().AddRoute("/maven", MavenServeFunc, MavenRenderFunc)
 	return ctx, nil
 
 }
 
-func MavenShutdownFunc(ctx context.Context) (context.Context, error) {
+func MavenStopperFunc(ctx context.Context) (context.Context, error) {
 	return ctx, nil
 }
 

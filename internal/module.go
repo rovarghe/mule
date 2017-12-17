@@ -140,9 +140,9 @@ func defaultRenderer(state schema.State, ctx schema.ReducerContext, r *http.Requ
 
 var (
 	bootstrapModule = schema.Module{
-		Plugin:   plugin.NewPlugin("bootstrap", plugin.Version{1, 0, 0, ""}, []plugin.Dependency{}),
-		Startup:  nil,
-		Shutdown: nil,
+		Plugin:  plugin.NewPlugin("bootstrap", plugin.Version{1, 0, 0, ""}, []plugin.Dependency{}),
+		Starter: nil,
+		Stopper: nil,
 	}
 
 	emptyPathSpec = schema.PathSpec("")
@@ -201,7 +201,7 @@ func startModule(ctx context.Context, lp *loader.LoadedPlugin) (context.Context,
 		return ctx, nil
 	}
 
-	if module.Startup == nil {
+	if module.Starter == nil {
 		log.Printf("Starting module: (%s, %s)", plugin.ID(), plugin.Version())
 		return ctx, nil
 	}
@@ -213,5 +213,5 @@ func startModule(ctx context.Context, lp *loader.LoadedPlugin) (context.Context,
 		loadedPlugin:         lp,
 	}
 
-	return module.Startup(ctx, mLoadingCtx)
+	return module.Starter.Start(ctx, mLoadingCtx)
 }

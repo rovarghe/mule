@@ -15,9 +15,9 @@ var (
 	version1 = plugin.Version{1, 0, 0, ""}
 
 	CoreModule = schema.Module{
-		Plugin:   plugin.NewPlugin(plugin.ID("mule"), version1, []plugin.Dependency{}),
-		Startup:  coreStartupFunc,
-		Shutdown: coreShutdownFunc,
+		Plugin:  plugin.NewPlugin(plugin.ID("mule"), version1, []plugin.Dependency{}),
+		Starter: schema.StarterFunc(coreStartupFunc),
+		Stopper: schema.StopperFunc(coreShutdownFunc),
 	}
 
 	AboutModule = schema.Module{
@@ -27,8 +27,8 @@ var (
 				Range: plugin.Range{version1, version1, true, true},
 			},
 		}),
-		Startup:  aboutStartupFunc,
-		Shutdown: nil,
+		Starter: schema.StarterFunc(aboutStartupFunc),
+		Stopper: nil,
 	}
 )
 
